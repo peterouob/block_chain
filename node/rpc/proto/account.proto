@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+option go_package = "../../rpc";
+
+message AccountRequest {
+  string pass = 1;
+}
+
+message AccountResponse {
+  string address = 1;
+}
+
+service Account {
+  rpc AccountCreate(AccountRequest) returns (AccountResponse) ;
+}
