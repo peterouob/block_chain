@@ -18,7 +18,7 @@ import (
 type Address string
 
 func NewAddress(pub *ecdsa.PublicKey) Address {
-	jpub, _ := json.Marshal(newP256k1Key(pub))
+	jpub, _ := json.Marshal(newP256k1PublicKey(pub))
 	hash := make([]byte, 64)
 	sha3.ShakeSum256(hash, jpub)
 	return Address(hex.EncodeToString(hash[:32]))
@@ -72,11 +72,11 @@ func (a *Account) Read(path string, pass []byte) (*Account, error) {
 }
 
 func (a *Account) encodePriveKey() ([]byte, error) {
-	return json.Marshal(newP256PrivateKey(a.prvKey))
+	return json.Marshal(newP256k1PrivateKey(a.prvKey))
 }
 
 func (a *Account) decodePriveKey(jprv []byte) (*Account, error) {
-	var pk p256PrivateKey
+	var pk p256k1PrivateKey
 
 	if err := json.Unmarshal(jprv, &pk); err != nil {
 		return nil, err
@@ -139,4 +139,26 @@ func (a *Account) decPassword(ciph, pass []byte) ([]byte, error) {
 
 func (a *Account) Addr() Address {
 	return a.addr
+}
+
+func (a *Account) Sign(data []byte) ([]byte, error) {
+	r, s, err := ecdsa.Sign(rand.Reader, a.prvKey, data)
+	if err != nil {
+		return nil, err
+	}
+
+	rBytes, sBytes := r.Bytes(), s.Bytes()
+	signBytes := make([]byte, 64)
+	copy(signBytes[32-len(rBytes):], rBytes)
+	copy(signBytes[64-len(sBytes):], sBytes)
+
+	pub := newP256k1PublicKey(&a.prvKey.PublicKey)
+	comPubKey := pub.Compress()
+
+	//signatureByte [flag:1byte,signByte:64byte,pubKey:32byte]
+	signatureByte := make([]byte, 98)
+	signatureByte[0] = 0x01
+	copy(signatureByte[1:65], signBytes)
+	copy(signatureByte[65:97], comPubKey)
+	return signatureByte, nil
 }
