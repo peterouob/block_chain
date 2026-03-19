@@ -22,7 +22,7 @@ func TestMain(m *testing.M) {
 	lis := bufconn.Listen(1024 * 1024)
 	s := grpc.NewServer()
 	rpc.RegisterAccountServer(s, &AccountService{
-		keyStorePath: tmpDir,
+		KeyStorePath: tmpDir,
 	})
 
 	go func() {
