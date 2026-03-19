@@ -14,7 +14,7 @@ func TestAccountKeyRoundTrip(t *testing.T) {
 	originalPrivKey, err := ecdsa.GenerateKey(ecc.P256k1(), rand.Reader)
 	assert.NoError(t, err, "Failed to generate private key")
 
-	customPrivKey := newP256PrivateKey(originalPrivKey)
+	customPrivKey := newP256k1PrivateKey(originalPrivKey)
 
 	assert.Equal(t, len(customPrivKey.D), 32)
 	assert.Equal(t, len(customPrivKey.RawData), 65)
@@ -40,4 +40,63 @@ func TestAccountKeyRoundTrip(t *testing.T) {
 
 	validOrg := ecdsa.Verify(&originalPrivKey.PublicKey, hash[:], r, s)
 	assert.Equal(t, validOrg, true)
+}
+
+func TestAccountKeySign(t *testing.T) {
+	account, err := NewAccount()
+	assert.NoError(t, err)
+
+	intent := IntentTransaction()
+	orimsg := IntentType("hello world")
+	intentMsg := NewIntentMessage(*intent, orimsg)
+	msg, err := intentMsg.Hash()
+
+	assert.NoError(t, err)
+	assert.NotEmpty(t, msg)
+
+	sig, err := account.Sign(msg)
+
+	assert.NoError(t, err)
+	assert.NotEmpty(t, sig)
+	assert.Equal(t, len(sig), 98)
+
+	s := ParseSignature(sig)
+
+	assert.NotNil(t, s.PubKey)
+	assert.NotNil(t, s.SigBytes)
+	assert.Equal(t, s.Scheme, SchemeType(0x01))
+
+	flag, err := s.Verify(msg)
+
+	assert.NoError(t, err)
+	assert.True(t, flag)
+
+	t.Run("wrong schema", func(t *testing.T) {
+		sig[0] = 0x02
+		s := ParseSignature(sig)
+		flag, err := s.Verify(msg)
+		assert.ErrorAs(t, err, ErrSchemeNotSupported)
+		assert.False(t, flag)
+	})
+
+	t.Run("invalid public key", func(t *testing.T) {
+		sig = sig[:32]
+		s := ParseSignature(sig)
+		flag, err := s.Verify(msg)
+		assert.ErrorAs(t, err, ErrInvalidPublicKey)
+		assert.False(t, flag)
+	})
+
+	t.Run("invalid ecdsa verify", func(t *testing.T) {
+		msg = []byte("hello world")
+		sig, err := account.Sign(msg)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, sig)
+		s := ParseSignature(sig)
+		msg = []byte("wrong intent msg")
+		flag, err := s.Verify(msg)
+		assert.ErrorAs(t, err, ErrEcdsaVerify)
+		assert.False(t, flag)
+	})
+
 }
