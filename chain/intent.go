@@ -39,8 +39,8 @@ type BCSMarshall interface {
 }
 
 type IntentMessage[T BCSMarshall] struct {
-	Intent Intent
 	Value  T
+	Intent Intent
 }
 
 func NewIntentMessage[T BCSMarshall](intent Intent, value T) *IntentMessage[T] {
