@@ -8,44 +8,6 @@ import (
 	"github.com/dustinxie/ecc"
 )
 
-type ObjectRef struct {
-	ObjectId       Address  `json:"object_id"`
-	SequenceNumber uint64   `json:"sequence_number"`
-	Digest         [32]byte `json:"digest"`
-}
-
-type TransactionType uint8
-
-type TransactionData struct {
-	Expiration *TransactionExpiration `json:"expiration,omitempty"`
-	Sender     Address                `json:"sender"`
-	GasData    GasData                `json:"gas_data"`
-	Type       TransactionType        `json:"type"`
-}
-
-type GasData struct {
-	Owner   Address     `json:"owner"`
-	Payment []ObjectRef `json:"payment"`
-	Price   uint64      `json:"price"`
-	Budget  uint64      `json:"budget"`
-}
-
-type EpochId uint64
-
-type TransactionExpiration struct {
-	Epoch   *EpochId     `json:"epoch,omitempty"`
-	ValidAt *ValidDuring `json:"valid_at,omitempty"`
-}
-
-type ValidDuring struct {
-	MinEpoch     *EpochId `json:"min_epoch,omitempty"`
-	MaxEpoch     *EpochId `json:"max_epoch,omitempty"`
-	MinTimeStamp *uint64  `json:"min_time_stamp,omitempty"`
-	MaxTimeStamp *uint64  `json:"max_time_stamp,omitempty"`
-	Chain        []byte   `json:"chain,omitempty"`
-	Nonce        uint32   `json:"nonce,omitempty"`
-}
-
 type SchemeType byte
 
 const (
@@ -111,9 +73,4 @@ func (s *Signature) Verify(intentMsg []byte) (bool, error) {
 	}
 
 	return true, nil
-}
-
-type SenderSignedData struct {
-	IntentMessage TransactionData `json:"intent_message"`
-	TxSignatures  []Signature     `json:"tx_signatures"`
 }

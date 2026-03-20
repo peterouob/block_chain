@@ -159,6 +159,6 @@ func (a *Account) Sign(data []byte) ([]byte, error) {
 	signatureByte := make([]byte, 98)
 	signatureByte[0] = 0x01
 	copy(signatureByte[1:65], signBytes)
-	copy(signatureByte[65:97], comPubKey)
+	copy(signatureByte[65:], comPubKey)
 	return signatureByte, nil
 }
