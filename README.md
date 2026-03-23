@@ -1,60 +1,34 @@
-# 從零實現一條區塊鏈
-
-本文件將帶你從概念到實作，逐步理解並建構一條 Move-based 區塊鏈的基礎設施。架構參考 Sui / Aptos 的設計，以 Go 語言實作。
+# 從零實現區塊鏈
 
 ---
 
 ## 目錄
 
-1. [整體架構概覽](#1-整體架構概覽)
-2. [第一層：密鑰與帳戶 (Account & Key)](#2-第一層密鑰與帳戶)
-3. [第二層：簽名系統 (Signature)](#3-第二層簽名系統)
-4. [第三層：意圖訊息 (Intent)](#4-第三層意圖訊息)
-5. [第四層：物件模型 (Object)](#5-第四層物件模型)
-6. [第五層：物件儲存 (ObjectStore)](#6-第五層物件儲存)
-7. [第六層：gRPC 服務節點 (Node)](#7-第六層grpc-服務節點)
-8. [資料流：一筆交易的完整生命週期](#8-資料流一筆交易的完整生命週期)
-9. [快速開始](#9-快速開始)
-10. [下一步：尚未實作的部分](#10-下一步尚未實作的部分)
+1. [未完成部分](#1-未完成部分)
+2. [密鑰與帳戶 (Account & Key)](#2-密鑰與帳戶)
+3. [簽名系統 (Signature)](#3-簽名系統)
+4. [意圖訊息 (Intent)](#4-意圖訊息)
+5. [物件模型 (Object)](#5-物件模型)
+6. [物件儲存 (ObjectStore)](#6-物件儲存)
+7. [資料流：一筆交易的完整生命週期](#7-一筆交易的完整生命週期)
+8. [交易的定義](#8-交易的基本定義)
 
 ---
+## 1. 未完成部分
 
-## 1. 整體架構概覽
 
-```
-┌─────────────────────────────────────────────────────┐
-│                   cmd/server                         │
-│            gRPC Server (:50051)                      │
-└──────────────────────┬──────────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────┐
-│               node/service                           │
-│          AccountService (gRPC Handler)               │
-└──────────────────────┬──────────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────┐
-│                    chain/                            │
-│                                                      │
-│  Account ──────► Sign() ──────► Signature.Verify()  │
-│     │                                ▲               │
-│     │                                │               │
-│     ▼                         IntentMessage.Hash()   │
-│  Address                             │               │
-│                               Intent (scope)         │
-│                                                      │
-│  Object ──────────────────► ObjectStore (in-memory) │
-│  (MoveObject / MovePackage)                          │
-└─────────────────────────────────────────────────────┘
-```
+| 模組 | 說明 |
+|------|------|
+| **Transaction** | 定義 TransactionData 結構（輸入 Object、指令列表、gas 設定） |
+| **Execution Engine** | 執行 Move 字節碼，對 ObjectStore 進行讀寫 |
+| **Mempool** | 收集待處理交易，按 gas price 排序 |
+| **Consensus** | 共識協議（PoS / BFT / DAG），決定交易執行順序 |
+| **Block / Checkpoint** | 將有序交易打包成區塊，計算全局狀態哈希 |
+| **P2P Network** | 節點間廣播交易與區塊 |
+| **持久化儲存** | 將 `InMemStore` 替換為 RocksDB 等持久化後端 |
+| **Gas 計費** | 計算指令執行成本，防止 DoS 攻擊 |
 
-區塊鏈的核心問題只有三個：
-- **誰**在操作？ → Account / Signature
-- **操作什麼**？ → Object / ObjectStore
-- **如何防止偽造**？ → Intent / Signature
-
----
-
-## 2. 第一層：密鑰與帳戶
+## 2. 密鑰與帳戶
 
 ### 2.1 為什麼用 Secp256k1？
 
@@ -157,7 +131,7 @@ func (a *Account) encPassword(msg, pass []byte) ([]byte, error) {
 
 ---
 
-## 3. 第二層：簽名系統
+## 3. 簽名系統
 
 ### 3.1 簽名格式
 
@@ -207,7 +181,7 @@ func (s *Signature) Verify(intentMsg []byte) (bool, error) {
 
 ---
 
-## 4. 第三層：意圖訊息
+## 4. 意圖訊息
 
 ### 4.1 為什麼需要 Intent？
 
@@ -249,7 +223,7 @@ BCS（Binary Canonical Serialization）來自 Diem/Libra，是確定性的二進
 
 ---
 
-## 5. 第四層：物件模型
+## 5. 物件模型
 
 ### 5.1 設計理念
 
@@ -322,7 +296,7 @@ type ObjectRef struct {
 
 ---
 
-## 6. 第五層：物件儲存
+## 6. 物件儲存
 
 ### 6.1 介面設計
 
@@ -358,72 +332,7 @@ reverseObject: map[Address]map[ObjectId]struct{} ← 反向索引，by 地址查
 
 ---
 
-## 7. 第六層：gRPC 服務節點
-
-### 7.1 Protobuf 定義
-
-```protobuf
-// node/rpc/proto/account.proto
-service Account {
-  rpc AccountCreate(AccountRequest) returns (AccountResponse);
-  rpc AccountBalance(AccountBalanceReq) returns (AccountBalanceRes);
-}
-```
-
-修改 proto 後，用以下命令重新生成 Go 代碼：
-
-```bash
-protoc --go_out=. --go-grpc_out=. ./node/rpc/proto/account.proto
-```
-
-### 7.2 服務層設計
-
-`AccountService` 依賴注入 `BalanceChecker` 介面，與帳本的具體實作解耦：
-
-```go
-// node/service/account.go
-type BalanceChecker interface {
-    Balance(address string) (uint64, bool)
-}
-
-type AccountService struct {
-    rpc.UnimplementedAccountServer
-    BalanceChecker BalanceChecker  // 注入，方便測試與替換
-    KeyStorePath   string
-}
-```
-
-### 7.3 AccountCreate 流程
-
-```
-Client ──gRPC──► AccountCreate(pass)
-                      │
-                      ▼
-              chain.NewAccount()         ← 生成 ECDSA 密鑰對
-                      │
-                      ▼
-              acc.Write(keystore, pass)  ← 加密存到磁盤
-                      │
-                      ▼
-              return Address             ← 回傳地址給 Client
-```
-
-### 7.4 啟動伺服器
-
-```go
-// cmd/server/main.go
-s := grpc.NewServer()
-rpc.RegisterAccountServer(s, &service.AccountService{
-    KeyStorePath:   "keystore",
-    BalanceChecker: &mockBalanceChecker{},
-})
-reflection.Register(s) // 啟用反射，grpcurl 可直接探索 API
-s.Serve(lis)
-```
-
----
-
-## 8. 資料流：一筆交易的完整生命週期
+## 7. 一筆交易的完整生命週期
 
 以下是當用戶發起一筆「轉移 Object 所有權」的交易時，各層組件如何協作：
 
@@ -452,49 +361,122 @@ s.Serve(lis)
    store.Delete(oldObjectId)      // 刪除舊版本（版本號不同即為新物件）
 ```
 
----
+## 8. 交易的基本定義
 
-## 9. 快速開始
+`交易最基本的訊息`
 
-**環境需求**
-- Go 1.21+
-- `protoc` + `protoc-gen-go` + `protoc-gen-go-grpc`（僅在修改 proto 時需要）
+```go
+// chain/transaction.go
+type TransactionData struct {
+	Kind    TransactionKind
+	Sender  Address
+	GasData GasData
+	Expire  TransactionExpirer
+}
+```
 
-```bash
-# 克隆並安裝依賴
-git clone <repo>
-cd block_chain_grpc
-go mod download
+`TransactionKind為interface交由交易類型實現`
 
-# 執行所有測試
-go test ./...
+```go
+type TransactionKind interface {
+	transactionType()
+}
 
-# 執行單一套件測試
-go test ./chain/... -v
+type ProgrammableTransaction struct {
+	Inputs   []CallArgs
+	Commands []ProgramCommand
+}
 
-# 執行單一測試函數
-go test ./chain/... -run TestObjectSerialize
+func NewProgrammableTransaction(inputs []CallArgs, commands []ProgramCommand) *ProgrammableTransaction {
+	return &ProgrammableTransaction{
+		Inputs:   inputs,
+		Commands: commands,
+	}
+}
 
-# 啟動 gRPC 伺服器（監聽 :50051）
-go run ./cmd/server/main.go
+func (p ProgrammableTransaction) transactionType() {}
 
-# 用 grpcurl 測試（需先安裝 grpcurl）
-grpcurl -plaintext -d '{"pass":"mypassword"}' localhost:50051 Account/AccountCreate
+```
+
+`其中何種交易方式也以interface定義並由該種交易方式實現,其中分為call by reference or call by value兩種交易參數方式`
+
+```go
+type ProgramCommand interface {
+	Command()
+}
+
+type TransferObject struct {
+	Objects   []uint16
+	Recipient uint16
+}
+
+func (t TransferObject) Command() {}
+
+type CallArgs interface {
+	argsType()
+}
+
+type RefCallArgs struct {
+	Ref ObjectRef
+}
+
+func (r RefCallArgs) argsType() {}
+
+type ValueCallArgs struct {
+	Address Address
+}
+
+func (v ValueCallArgs) argsType() {}
+
+```
+
+`交易時間部分則簡單已None(無規定)或是依照EpochId規定時間決定`
+
+```go
+type TransactionExpirer interface {
+	expireType()
+}
+
+type NoneExpire struct{}
+
+func (n NoneExpire) expireType() {}
+
+type EpochExpire struct {
+	EpochId EpochId
+}
+
+func (e EpochExpire) expireType() {}
+```
+
+### 目前架構
+
+```text
+[ Account ] ───> [  Intent  ] ───┐
+                            │           │
+                            ▼           ▼
+  ┌─────────────────────────────────────────────────────────┐
+  │                   TransactionData                       │
+  │  ┌──────────────┐    ┌──────────┐    ┌──────────────┐   │
+  │  │ Programmable │    │ GasData  │    │  Expiration  │   │
+  │  └──────────────┘    └──────────┘    └──────────────┘   │
+  └────────────────────────────┬────────────────────────────┘
+                               │
+                            submit
+                               ▼
+  ┌ - - - - - - - - - - - - - - - - - - - - - - - - - - - - ┐
+  :             Execution engine (next step)                :
+  :  ┌──────────────┐    ┌──────────────┐    ┌──────────┐   :
+  :  │ Verify       │    │ Check        │    │ Execute  │   :
+  :  │ signature    │    │ owner        │    │ commands │   :
+  :  └──────────────┘    └──────────────┘    └──────────┘   :
+  └ - - - - - - - - - - - - - -┬ - - - - - - - - - - - - - -┘
+                               │
+                          read / write
+                               ▼
+  ┌─────────────────────────────────────────────────────────┐
+  │                Object Store (InMemStore)                │
+  │        Get / Put / Delete / GetByOwner / Exists         │
+  └─────────────────────────────────────────────────────────┘
 ```
 
 ---
-
-## 10. 下一步：尚未實作的部分
-
-目前 `chain/transcation.go` 是空檔，以下是完整區塊鏈還需要的核心模組：
-
-| 模組 | 說明 |
-|------|------|
-| **Transaction** | 定義 TransactionData 結構（輸入 Object、指令列表、gas 設定） |
-| **Execution Engine** | 執行 Move 字節碼，對 ObjectStore 進行讀寫 |
-| **Mempool** | 收集待處理交易，按 gas price 排序 |
-| **Consensus** | 共識協議（PoS / BFT / DAG），決定交易執行順序 |
-| **Block / Checkpoint** | 將有序交易打包成區塊，計算全局狀態哈希 |
-| **P2P Network** | 節點間廣播交易與區塊 |
-| **持久化儲存** | 將 `InMemStore` 替換為 RocksDB 等持久化後端 |
-| **Gas 計費** | 計算指令執行成本，防止 DoS 攻擊 |
