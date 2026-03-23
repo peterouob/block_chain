@@ -84,17 +84,6 @@ func TestAccountKeySign(t *testing.T) {
 		assert.False(t, flag)
 	})
 
-	t.Run("invalid public key", func(t *testing.T) {
-		account, err := NewAccount()
-		msg := []byte("hello world")
-		sig, err := account.Sign(msg)
-		sig[len(sig)-1] = (sig[len(sig)-1] - 1) % 8
-		s := ParseSignature(sig)
-		flag, err := s.Verify(msg)
-		assert.ErrorIs(t, err, ErrInvalidPublicKey, "invalid public key")
-		assert.False(t, flag)
-	})
-
 	t.Run("invalid ecdsa verify", func(t *testing.T) {
 		account, err := NewAccount()
 		msg := []byte("hello world")

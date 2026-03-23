@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGCMKey(t *testing.T) {
@@ -51,6 +52,9 @@ func TestAccountWriteRead(t *testing.T) {
 	assert.Nil(t, a)
 
 	account2, _ := NewAccount()
+	_, err = account2.Read(expectFilePath, pass)
+	require.Error(t, err)
+	pass = []byte("wrong password 123123")
 	err = account2.Write(dir, pass)
-	assert.Error(t, err)
+	require.NoError(t, err)
 }
