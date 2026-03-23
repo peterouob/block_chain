@@ -23,9 +23,10 @@ func NewTransactionData(sender Address, kind TransactionKind, gasData GasData, e
 }
 
 var (
-	ErrTransactionSenderInvalid  = errors.New("transaction sender invalid")
-	ErrTransactionProgramInvalid = errors.New("transaction program invalid")
-	ErrTransactionExpired        = errors.New("transaction expired")
+	ErrTransactionSenderInvalid = errors.New("transaction sender invalid")
+	ErrTransactionRecipient     = errors.New("transaction Recipient invalid")
+	ErrTransactionObjectInvalid = errors.New("transaction object invalid")
+	ErrTransactionExpired       = errors.New("transaction expired")
 )
 
 func (t *TransactionData) Valid() error {
@@ -33,13 +34,21 @@ func (t *TransactionData) Valid() error {
 		return ErrTransactionSenderInvalid
 	}
 
-	if program, ok := t.Kind.(*ProgrammableTransaction); ok &&
-		program.Inputs == nil ||
-		program.Commands == nil ||
-		(program.Inputs != nil &&
-			program.Commands != nil &&
-			len(program.Inputs) != len(program.Commands)) {
-		return ErrTransactionProgramInvalid
+	if v, ok := t.Kind.(*ProgrammableTransaction); ok {
+		for _, cmd := range v.Commands {
+			switch c := cmd.(type) {
+			case *TransferObject:
+				if c.Recipient >= uint16(len(v.Inputs)) {
+					return ErrTransactionRecipient
+				}
+
+				for _, obj := range c.Objects {
+					if obj >= uint16(len(v.Inputs)) {
+						return ErrTransactionObjectInvalid
+					}
+				}
+			}
+		}
 	}
 
 	if expire, ok := t.Expire.(*EpochExpire); ok && expire.EpochId == 0 {
