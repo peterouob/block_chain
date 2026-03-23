@@ -1,22 +1,19 @@
-package trnasaction
+package chain
 
 import (
 	"errors"
-
-	"github.com/peterouob/block_chain/chain/account"
-	"github.com/peterouob/block_chain/chain/object"
 )
 
 type EpochId uint64
 
 type TransactionData struct {
 	Kind    TransactionKind
-	Sender  account.Address
+	Sender  Address
 	GasData GasData
 	Expire  TransactionExpirer
 }
 
-func NewTransactionData(sender account.Address, kind TransactionKind, gasData GasData, expire TransactionExpirer) *TransactionData {
+func NewTransactionData(sender Address, kind TransactionKind, gasData GasData, expire TransactionExpirer) *TransactionData {
 	return &TransactionData{
 		Sender:  sender,
 		Kind:    kind,
@@ -52,8 +49,8 @@ func (t *TransactionData) Valid() error {
 }
 
 type GasData struct {
-	Payments []object.ObjectRef
-	Owner    account.Address
+	Payments []ObjectRef
+	Owner    Address
 	Price    uint64
 	Budget   uint64
 }
@@ -106,13 +103,13 @@ type CallArgs interface {
 }
 
 type RefCallArgs struct {
-	Ref object.ObjectRef
+	Ref ObjectRef
 }
 
 func (r RefCallArgs) argsType() {}
 
 type ValueCallArgs struct {
-	Address account.Address
+	Address Address
 }
 
 func (v ValueCallArgs) argsType() {}

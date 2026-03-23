@@ -1,4 +1,4 @@
-package intent
+package chain
 
 import (
 	"crypto/rand"

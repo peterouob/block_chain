@@ -1,30 +1,28 @@
-package object
+package chain
 
 import (
 	"errors"
 	"sync"
-
-	"github.com/peterouob/block_chain/chain/account"
 )
 
 type ObjectStorer interface {
 	Get(id ObjectId) (Object, error)
 	Put(object Object) error
 	Delete(id ObjectId) error
-	GetByOwner(address account.Address) ([]Object, error)
+	GetByOwner(address Address) ([]Object, error)
 	Exists(id ObjectId) bool
 }
 
 type InMemStore struct {
 	objects       map[ObjectId]Object
-	reverseObject map[account.Address]map[ObjectId]struct{}
+	reverseObject map[Address]map[ObjectId]struct{}
 	ru            sync.RWMutex
 }
 
 func NewInMemStore() *InMemStore {
 	return &InMemStore{
 		objects:       make(map[ObjectId]Object),
-		reverseObject: make(map[account.Address]map[ObjectId]struct{}),
+		reverseObject: make(map[Address]map[ObjectId]struct{}),
 	}
 }
 
@@ -85,7 +83,7 @@ func (s *InMemStore) Delete(id ObjectId) error {
 	return nil
 }
 
-func (s *InMemStore) GetByOwner(address account.Address) ([]Object, error) {
+func (s *InMemStore) GetByOwner(address Address) ([]Object, error) {
 	var objects []Object
 	s.ru.RLock()
 	defer s.ru.RUnlock()

@@ -1,4 +1,4 @@
-package object
+package chain
 
 import (
 	"bytes"
@@ -7,7 +7,6 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/peterouob/block_chain/chain/account"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -110,7 +109,7 @@ type Owner interface {
 }
 
 type AddressOwner struct {
-	Address account.Address
+	Address Address
 }
 
 func (a *AddressOwner) ownerKind() {}
