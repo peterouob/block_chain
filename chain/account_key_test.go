@@ -95,4 +95,13 @@ func TestAccountKeySign(t *testing.T) {
 		assert.False(t, flag)
 	})
 
+	t.Run("from public key get account address", func(t *testing.T) {
+		account, _ := NewAccount()
+		addr := account.Addr()
+		msg := []byte("hello world")
+		sig, _ := account.Sign(msg)
+		s := ParseSignature(sig)
+		addr2 := s.DecodeAddress()
+		assert.Equal(t, addr, addr2)
+	})
 }

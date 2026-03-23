@@ -74,3 +74,16 @@ func (s *Signature) Verify(intentMsg []byte) (bool, error) {
 
 	return true, nil
 }
+
+func (s *Signature) DecodeAddress() Address {
+	curve := ecc.P256k1()
+	x, y, _ := DeCompressPubKey(s.PubKey)
+
+	pubKey := &ecdsa.PublicKey{
+		Curve: curve,
+		X:     x,
+		Y:     y,
+	}
+
+	return NewAddress(pubKey)
+}
