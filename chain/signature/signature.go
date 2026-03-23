@@ -1,4 +1,4 @@
-package chain
+package signature
 
 import (
 	"crypto/ecdsa"
@@ -6,6 +6,7 @@ import (
 	"math/big"
 
 	"github.com/dustinxie/ecc"
+	"github.com/peterouob/block_chain/chain/account"
 )
 
 type SchemeType byte
@@ -52,7 +53,7 @@ func (s *Signature) Verify(intentMsg []byte) (bool, error) {
 	sV := new(big.Int).SetBytes(s.SigBytes[32:])
 
 	curve := ecc.P256k1()
-	x, y, err := DeCompressPubKey(s.PubKey)
+	x, y, err := account.DeCompressPubKey(s.PubKey)
 
 	if err != nil {
 		return false, err

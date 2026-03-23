@@ -1,10 +1,11 @@
-package chain
+package object
 
 import (
 	"fmt"
 	"sync"
 	"testing"
 
+	"github.com/peterouob/block_chain/chain/account"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -154,13 +155,13 @@ func TestStoreOwnerQueries(t *testing.T) {
 		store := NewInMemStore()
 		count := 1000
 		for i := 0; i < count; i++ {
-			addr := Address(fmt.Sprintf("addr_%d", i%10))
+			addr := account.Address(fmt.Sprintf("addr_%d", i%10))
 			obj := newStoreTestObject(byte(i%256), &AddressOwner{Address: addr})
 			obj.data.(*MoveObject).ObjectId = ObjectId{byte(i >> 8), byte(i)}
 			require.NoError(t, store.Put(obj))
 		}
 		for i := 0; i < 10; i++ {
-			addr := Address(fmt.Sprintf("addr_%d", i))
+			addr := account.Address(fmt.Sprintf("addr_%d", i))
 			objs, _ := store.GetByOwner(addr)
 			assert.Equal(t, 100, len(objs))
 		}

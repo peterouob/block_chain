@@ -1,4 +1,4 @@
-package chain
+package intent
 
 import (
 	"github.com/fardream/go-bcs/bcs"

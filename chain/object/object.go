@@ -1,11 +1,13 @@
-package chain
+package object
 
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"maps"
 	"slices"
 
+	"github.com/peterouob/block_chain/chain/account"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -40,14 +42,20 @@ type Object struct {
 	storageRebate       uint64
 }
 
+const maxData = 1024 * 1024
+
+var ErrDataTooLarge = errors.New("data too large")
+
 func (o *Object) Serialize() ([]byte, error) {
-	// TODO: forbedan big data
-	buf := bytes.NewBuffer(nil)
-	bf := &binWriter{w: buf}
 	data, err := o.data.Serialize()
+	if len(data) > maxData {
+		return nil, ErrDataTooLarge
+	}
 	if err != nil {
 		return nil, err
 	}
+	buf := bytes.NewBuffer(nil)
+	bf := &binWriter{w: buf}
 	bf.raw(data)
 	owner, err := o.owner.serialize()
 	if err != nil {
@@ -102,7 +110,7 @@ type Owner interface {
 }
 
 type AddressOwner struct {
-	Address Address
+	Address account.Address
 }
 
 func (a *AddressOwner) ownerKind() {}

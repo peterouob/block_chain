@@ -1,4 +1,4 @@
-package chain
+package account
 
 import (
 	"crypto/ecdsa"

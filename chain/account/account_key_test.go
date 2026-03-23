@@ -1,4 +1,4 @@
-package chain
+package account
 
 import (
 	"crypto/ecdsa"
@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/dustinxie/ecc"
+	"github.com/peterouob/block_chain/chain/intent"
+	"github.com/peterouob/block_chain/chain/signature"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -47,9 +49,9 @@ func TestAccountKeySign(t *testing.T) {
 		account, err := NewAccount()
 		assert.NoError(t, err)
 
-		intent := IntentTransaction()
-		orimsg := IntentType("hello world")
-		intentMsg := NewIntentMessage(*intent, orimsg)
+		intent := intent.IntentTransaction()
+		orimsg := intent.IntentType("hello world")
+		intentMsg := intent.NewIntentMessage(*intent, orimsg)
 		msg, err := intentMsg.Hash()
 
 		assert.NoError(t, err)
@@ -61,11 +63,11 @@ func TestAccountKeySign(t *testing.T) {
 		assert.NotEmpty(t, sig)
 		assert.Equal(t, len(sig), 98)
 
-		s := ParseSignature(sig)
+		s := signature.ParseSignature(sig)
 
 		assert.NotNil(t, s.PubKey)
 		assert.NotNil(t, s.SigBytes)
-		assert.Equal(t, s.Scheme, SchemeType(0x01))
+		assert.Equal(t, s.Scheme, signature.SchemeType(0x01))
 
 		flag, err := s.Verify(msg)
 
@@ -78,9 +80,9 @@ func TestAccountKeySign(t *testing.T) {
 		msg := []byte("hello world")
 		sig, err := account.Sign(msg)
 		sig[0] = 0x02
-		s := ParseSignature(sig)
+		s := signature.ParseSignature(sig)
 		flag, err := s.Verify(msg)
-		assert.ErrorIs(t, err, ErrSchemeNotSupported, "schema not supported")
+		assert.ErrorIs(t, err, signature.ErrSchemeNotSupported, "schema not supported")
 		assert.False(t, flag)
 	})
 
@@ -90,10 +92,10 @@ func TestAccountKeySign(t *testing.T) {
 		sig, err := account.Sign(msg)
 		assert.NoError(t, err)
 		assert.NotEmpty(t, sig)
-		s := ParseSignature(sig)
+		s := signature.ParseSignature(sig)
 		msg = []byte("wrong intent msg")
 		flag, err := s.Verify(msg)
-		assert.ErrorIs(t, err, ErrEcdsaVerify, "invalid ecdsa verify")
+		assert.ErrorIs(t, err, signature.ErrEcdsaVerify, "invalid ecdsa verify")
 		assert.False(t, flag)
 	})
 
