@@ -41,6 +41,7 @@ type Object struct {
 }
 
 func (o *Object) Serialize() ([]byte, error) {
+	// TODO: forbedan big data
 	buf := bytes.NewBuffer(nil)
 	bf := &binWriter{w: buf}
 	data, err := o.data.Serialize()
