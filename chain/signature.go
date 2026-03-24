@@ -43,9 +43,9 @@ var (
 	ErrEcdsaVerify        = errors.New("ecdsa verify failed")
 )
 
-func (s *Signature) Verify(intentMsg []byte) (bool, error) {
+func (s *Signature) Verify(intentMsg []byte) error {
 	if s.Scheme != SchemeSecp256k1 {
-		return false, ErrSchemeNotSupported
+		return ErrSchemeNotSupported
 	}
 
 	rV := new(big.Int).SetBytes(s.SigBytes[:32])
@@ -55,11 +55,11 @@ func (s *Signature) Verify(intentMsg []byte) (bool, error) {
 	x, y, err := DeCompressPubKey(s.PubKey)
 
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	if x == nil || y == nil {
-		return false, ErrInvalidPublicKey
+		return ErrInvalidPublicKey
 	}
 
 	pubKey := &ecdsa.PublicKey{
@@ -69,21 +69,13 @@ func (s *Signature) Verify(intentMsg []byte) (bool, error) {
 	}
 
 	if !ecdsa.Verify(pubKey, intentMsg, rV, sV) {
-		return false, ErrEcdsaVerify
+		return ErrEcdsaVerify
 	}
 
-	return true, nil
+	return nil
 }
 
 func (s *Signature) DecodeAddress() Address {
-	curve := ecc.P256k1()
-	x, y, _ := DeCompressPubKey(s.PubKey)
-
-	pubKey := &ecdsa.PublicKey{
-		Curve: curve,
-		X:     x,
-		Y:     y,
-	}
-
+	pubKey := ByteToPubKey(s.PubKey)
 	return NewAddress(pubKey)
 }
