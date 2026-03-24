@@ -205,7 +205,7 @@ IntentMessage 序列化：
 ```go
 // intent.go
 func (i *IntentMessage[T]) Hash() ([]byte, error) {
-    valueByte, _ := i.Value.BCSByte()   // BCS 序列化交易資料
+    valueByte, _ := i.Value.Serialize()   // BCS 序列化交易資料
     intentMsg := i.Intent.ToBytes()      // [scope, version, appId]
 
     h, _ := blake2b.New256(nil)
@@ -363,7 +363,7 @@ reverseObject: map[Address]map[ObjectId]struct{} ← 反向索引，by 地址查
 
 ## 8. 交易的基本定義
 
-`交易最基本的訊息`
+- 交易最基本的訊息
 
 ```go
 // chain/transaction.go
@@ -375,7 +375,7 @@ type TransactionData struct {
 }
 ```
 
-`TransactionKind為interface交由交易類型實現`
+- TransactionKind為interface交由交易類型實現
 
 ```go
 type TransactionKind interface {
@@ -398,7 +398,7 @@ func (p ProgrammableTransaction) transactionType() {}
 
 ```
 
-`其中何種交易方式也以interface定義並由該種交易方式實現,其中分為call by reference or call by value兩種交易參數方式`
+- 其中何種交易方式也以interface定義並由該種交易方式實現,其中分為call by reference or call by value兩種交易參數方式
 
 ```go
 type ProgramCommand interface {
@@ -430,7 +430,7 @@ func (v ValueCallArgs) argsType() {}
 
 ```
 
-`交易時間部分則簡單已None(無規定)或是依照EpochId規定時間決定`
+- 交易時間部分則簡單已None(無規定)或是依照EpochId規定時間決定
 
 ```go
 type TransactionExpirer interface {
@@ -446,6 +446,182 @@ type EpochExpire struct {
 }
 
 func (e EpochExpire) expireType() {}
+```
+
+## 9. Execute Engine
+- 關鍵流程
+```text
+=====================================================================================================
+
+	PROGRAMMABLE TRANSACTION EXECUTION FLOW
+
+=====================================================================================================
+
+	[1. Transaction Validation & Auth]
+	   |
+	   +-- Decode Signature -> Check Address (Signature Address == tx.Sender)
+	   +-- Create IntentMessage Hash -> Verify Signature
+	   +-- Ensure tx.Kind == *ProgrammableTransaction
+
+	[2. Input Resolution (Read Phase)]
+	   |
+	   |  Inputs: [ 0: CoinX(Ref), 1: CoinY(Ref), 2: Bob(Val), 3: Charlie(Val) ]
+	   |
+	   +-> Iterate Inputs:
+	       +-> Index 0 (RefCallArg): Fetch CoinX from Store -> Check Owner & Version -> Cache
+	       +-> Index 1 (RefCallArg): Fetch CoinY from Store -> Check Owner & Version -> Cache
+	       +-> Index 2 (ValueCallArg): Skip (Recipient Address)
+	       +-> Index 3 (ValueCallArg): Skip (Recipient Address)
+
+	[3. Command Execution (Mutation Phase)]
+	   |
+	   |  Commands: [ TransferObject{Objs:[0], Rec:2}, TransferObject{Objs:[1], Rec:3} ]
+	   |  Transaction Hash generated -> txDigest
+	   |
+	   +-> Command 1: TransferObject
+	   |    +-> Recipient: Read Inputs[2] -> Bob's Address
+	   |    +-> Object: Read Inputs[0] -> CoinX (from Cache)
+	   |    +-> Mutate CoinX: SetOwner(Bob), IncVersion(), previousTransaction = txDigest
+	   |    +-> Record Effect: MutatedObjects.append(CoinX_OldRef -> CoinX_NewRef)
+	   |
+	   +-> Command 2: TransferObject
+	        +-> Recipient: Read Inputs[3] -> Charlie's Address
+	        +-> Object: Read Inputs[1] -> CoinY (from Cache)
+	        +-> Mutate CoinY: SetOwner(Charlie), IncVersion(), previousTransaction = txDigest
+	        +-> Record Effect: MutatedObjects.append(CoinY_OldRef -> CoinY_NewRef)
+
+	[4. State Persistence (Write Phase)]
+	   |
+	   +-- Store.Put(CoinX) (State updated: New Owner is Bob, Version incremented)
+	   +-- Store.Put(CoinY) (State updated: New Owner is Charlie, Version incremented)
+
+	[5. Return Execution Effect]
+	   |
+	   +-- Status: Success
+	   +-- TransactionDigest: txDigest
+	   +-- MutatedObjects: [ (CoinX_Old -> CoinX_New), (CoinY_Old -> CoinY_New) ]
+
+=====================================================================================================
+```
+
+### Command Flow
+```text
+Inputs: [
+
+	index 0: RefCallArgs{CoinX},
+	index 1: RefCallArgs{CoinY},
+	index 2: ValueCallArgs{Bob},
+	index 3: ValueCallArgs{Charlie},
+
+]
+
+Commands: [
+
+	TransferObject{Objects: [0], Recipient: 2},
+	TransferObject{Objects: [1], Recipient: 3},
+
+]
+```
+
+### 1. Transaction Validation & Auth
+```go
+	if address != tx.Sender {
+		return nil, ErrExecutionAddrInvalid
+	}
+	intent := IntentTransaction()
+	intentMsg := NewIntentMessage(*intent, tx)
+	hash, err := intentMsg.Hash()
+	if err != nil {
+		return nil, err
+	}
+	if err := signature.Verify(hash); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Valid(); err != nil {
+		return nil, err
+	}
+```
+
+### 2. Input Resolution 
+```go
+	for _, input := range program.Inputs {
+		switch i := input.(type) {
+		case *RefCallArgs: // to transfer the object so we need to collect the input object which we want to transfer
+			obj, err := e.Store.Get(i.Ref.ObjectId)
+			if err != nil {
+				return nil, err
+			}
+			if obj.GetVersion() != i.Ref.Version {
+				return nil, ErrExecutionVersionNotEqual
+			}
+			addrOwner, ok := obj.owner.(*AddressOwner)
+			if !ok {
+				return nil, ErrExecutionObjectOwnerType
+			}
+			if addrOwner.Address != address {
+				return nil, ErrExecutionSenderNotTheSame
+			}
+			objects[i.Ref.ObjectId] = obj
+		default:
+			continue
+		}
+	}
+```
+
+### 3. Command Execution
+```go
+for _, command := range program.Commands {
+		switch c := command.(type) {
+		case *TransferObject:
+			// args to know the recipient, so we need to get the address
+			args, ok := program.Inputs[c.Recipient].(*ValueCallArgs)
+			if !ok {
+				return nil, ErrExecutionAssertFailed
+			}
+
+			for _, objIdx := range c.Objects {
+				refCallArg, ok := program.Inputs[objIdx].(*RefCallArgs)
+				if !ok {
+					return nil, ErrExecutionAssertFailed
+				}
+				ref := refCallArg.Ref
+				oldRef = ref
+				obj, ok := objects[ref.ObjectId]
+				if !ok {
+					return nil, ErrExecutionAssertFailed
+				}
+				
+				// Apply mutations
+				obj.SetOwner(&AddressOwner{args.Address})
+				obj.data.IncrementVersion()
+				obj.previousTransaction = txDigest
+				newRef, err = obj.Ref()
+				if err != nil {
+					return nil, err
+				}
+				
+				effect.MutatedObjects = append(effect.MutatedObjects, MutatedObjects{oldRef, *newRef})
+				objects[ref.ObjectId] = obj
+			}
+		}
+	}
+```
+
+### 4. State Persistence 
+```go
+for _, obj := range objects {
+		if err := e.Store.Put(obj); err != nil {
+			return nil, err
+		}
+	}
+```
+
+### 5. Return Effect
+```go
+effect.TransactionDigest = txDigest
+effect.Status = TransferStatus{nil, true}
+effect.GasUsed = struct{}{} // gas used temporarily isn't implemented
 ```
 
 ### 目前架構
