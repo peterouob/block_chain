@@ -40,7 +40,7 @@ func NewAccount() (*Account, error) {
 }
 
 func (a *Account) Write(dir string, pass []byte) error {
-	jprv, err := a.encodePriveKey()
+	jprv, err := a.encodePrivateKey()
 	if err != nil {
 		return err
 	}
@@ -68,14 +68,14 @@ func (a *Account) Read(path string, pass []byte) (*Account, error) {
 		return nil, err
 	}
 
-	return a.decodePriveKey(jprv)
+	return a.decodePrivateKey(jprv)
 }
 
-func (a *Account) encodePriveKey() ([]byte, error) {
+func (a *Account) encodePrivateKey() ([]byte, error) {
 	return json.Marshal(newP256k1PrivateKey(a.prvKey))
 }
 
-func (a *Account) decodePriveKey(jprv []byte) (*Account, error) {
+func (a *Account) decodePrivateKey(jprv []byte) (*Account, error) {
 	var pk p256k1PrivateKey
 
 	if err := json.Unmarshal(jprv, &pk); err != nil {
