@@ -26,14 +26,20 @@ var (
 	ErrExecutionAssertFailed     = errors.New("execution assert failed")
 )
 
-func (e *ExecutionEngin) Execute(tx TransactionData, signature Signature, intentMsg []byte) (*ExecutionEffect, error) {
+func (e *ExecutionEngin) Execute(tx *TransactionData, signature Signature) (*ExecutionEffect, error) {
+	var err error
 	effect := &ExecutionEffect{}
 	address := signature.DecodeAddress()
 	if address != tx.Sender {
 		return nil, ErrExecutionAddrInvalid
 	}
-
-	if err := signature.Verify(intentMsg); err != nil {
+	intent := IntentTransaction()
+	intentMsg := NewIntentMessage(*intent, tx)
+	hash, err := intentMsg.Hash()
+	if err != nil {
+		return nil, err
+	}
+	if err := signature.Verify(hash); err != nil {
 		return nil, err
 	}
 
@@ -73,7 +79,6 @@ func (e *ExecutionEngin) Execute(tx TransactionData, signature Signature, intent
 
 	var oldRef ObjectRef
 	var newRef *ObjectRef
-	var err error
 
 	txDigest, err := tx.Hash()
 	if err != nil {

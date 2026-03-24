@@ -8,8 +8,11 @@ import (
 type IntentScope uint8
 
 const (
-	TransactionDataScope       IntentScope = 0
-	IntentScopePersonalMessage IntentScope = 3
+	TransactionDataScope IntentScope = iota
+	TransactionEffects
+	CheckpointSummary
+	PersonalMessage
+	SenderSignedTransaction
 )
 
 // Intent
@@ -35,7 +38,7 @@ func IntentTransaction() *Intent {
 }
 
 type BCSMarshall interface {
-	BCSByte() ([]byte, error)
+	Serialize() ([]byte, error)
 }
 
 type IntentMessage[T BCSMarshall] struct {
@@ -52,12 +55,12 @@ func NewIntentMessage[T BCSMarshall](intent Intent, value T) *IntentMessage[T] {
 
 type IntentType []byte
 
-func (in IntentType) BCSByte() ([]byte, error) {
+func (in IntentType) Serialize() ([]byte, error) {
 	return in, nil
 }
 
 func (i *IntentMessage[T]) Hash() ([]byte, error) {
-	valueByte, err := i.Value.BCSByte()
+	valueByte, err := i.Value.Serialize()
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +73,7 @@ func (i *IntentMessage[T]) Hash() ([]byte, error) {
 	return h.Sum(nil), nil
 }
 
-func (i *IntentMessage[T]) BCSByte() ([]byte, error) {
+func (i *IntentMessage[T]) Serialize() ([]byte, error) {
 	bytes, err := bcs.Marshal(i)
 	if err != nil {
 		return nil, err
