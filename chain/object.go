@@ -2,32 +2,12 @@ package chain
 
 import (
 	"bytes"
-	"encoding/binary"
 	"errors"
 	"maps"
 	"slices"
 
 	"golang.org/x/crypto/sha3"
 )
-
-type binWriter struct {
-	w   *bytes.Buffer
-	err error
-}
-
-func (bw *binWriter) write(data any) {
-	if bw.err != nil {
-		return
-	}
-	bw.err = binary.Write(bw.w, binary.LittleEndian, data)
-}
-
-func (bw *binWriter) raw(p []byte) {
-	if bw.err != nil {
-		return
-	}
-	_, bw.err = bw.w.Write(p)
-}
 
 type (
 	ObjectId [32]byte
@@ -74,6 +54,10 @@ func (o *Object) GetObjectID() ObjectId {
 func (o *Object) GetVersion() uint64 {
 	info := o.data.getInformation()
 	return info.version
+}
+
+func (o *Object) SetOwner(owner Owner) {
+	o.owner = owner
 }
 
 type ObjectRef struct {
@@ -167,6 +151,7 @@ const (
 type ObjectData interface {
 	getInformation() objectInformation
 	Serialize() ([]byte, error)
+	IncrementVersion()
 }
 
 type objectInformation struct {
@@ -209,6 +194,10 @@ func (m *MoveObject) Serialize() ([]byte, error) {
 	return bw.w.Bytes(), nil
 }
 
+func (m *MoveObject) IncrementVersion() {
+	m.Version++
+}
+
 type MovePackage struct {
 	ObjectId ObjectId
 	Version  uint64
@@ -245,3 +234,5 @@ func (m *MovePackage) Serialize() ([]byte, error) {
 
 	return bw.w.Bytes(), nil
 }
+
+func (m *MovePackage) IncrementVersion() {}
