@@ -12,6 +12,7 @@
 6. [物件儲存 (ObjectStore)](#6-物件儲存)
 7. [資料流：一筆交易的完整生命週期](#7-一筆交易的完整生命週期)
 8. [交易的定義](#8-交易的基本定義)
+9. [Execute Engine](#9-execute-engine)
 
 ---
 ## 1. 未完成部分
@@ -449,6 +450,29 @@ func (e EpochExpire) expireType() {}
 ```
 
 ## 9. Execute Engine
+
+- core type
+
+```go
+type ExecutionEngin struct {
+	Store ObjectStorer // store interface
+}
+
+// Return the Execution Effect when Execute success
+type ExecutionEffect struct {
+	Status            TransferStatus
+	TransactionDigest Digest
+	MutatedObjects    []MutatedObjects
+	GasUsed           struct{}
+}
+
+// MutatedObjects Record the State before change and after change
+type MutatedObjects struct {
+	Before ObjectRef
+	After  ObjectRef
+}
+```
+
 - 關鍵流程
 ```text
 =====================================================================================================
