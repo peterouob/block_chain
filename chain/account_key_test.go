@@ -65,10 +65,9 @@ func TestAccountKeySign(t *testing.T) {
 		assert.NotNil(t, s.SigBytes)
 		assert.Equal(t, s.Scheme, SchemeType(0x01))
 
-		flag, err := s.Verify(msg)
+		err = s.Verify(msg)
 
 		assert.NoError(t, err)
-		assert.True(t, flag)
 	})
 
 	t.Run("wrong schema", func(t *testing.T) {
@@ -77,9 +76,8 @@ func TestAccountKeySign(t *testing.T) {
 		sig, err := account.Sign(msg)
 		sig[0] = 0x02
 		s := ParseSignature(sig)
-		flag, err := s.Verify(msg)
+		err = s.Verify(msg)
 		assert.ErrorIs(t, err, ErrSchemeNotSupported, "schema not supported")
-		assert.False(t, flag)
 	})
 
 	t.Run("invalid ecdsa verify", func(t *testing.T) {
@@ -90,9 +88,8 @@ func TestAccountKeySign(t *testing.T) {
 		assert.NotEmpty(t, sig)
 		s := ParseSignature(sig)
 		msg = []byte("wrong intent msg")
-		flag, err := s.Verify(msg)
+		err = s.Verify(msg)
 		assert.ErrorIs(t, err, ErrEcdsaVerify, "invalid ecdsa verify")
-		assert.False(t, flag)
 	})
 
 	t.Run("from public key get account address", func(t *testing.T) {
