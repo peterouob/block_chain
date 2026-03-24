@@ -1,5 +1,5 @@
 # 從零實現區塊鏈
-
+- 主要參考 [sui](https://github.com/MystenLabs/sui)
 ---
 
 ## 目錄
