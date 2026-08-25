@@ -1,6 +1,15 @@
 package chain
 
-import "errors"
+import (
+	"bytes"
+	"crypto/sha3"
+	"errors"
+)
+
+type Moneier interface {
+	Serialize() ([]byte, error)
+	Digest() (Digest, error)
+}
 
 type ExecutionEngin struct {
 	Store ObjectStorer
@@ -13,9 +22,113 @@ type ExecutionEffect struct {
 	GasUsed           struct{}
 }
 
+func (e ExecutionEffect) Serialize() ([]byte, error) {
+	buf := new(bytes.Buffer)
+
+	bw := binWriter{w: buf}
+	statusBytes, err := e.Status.Serialize()
+	if err != nil {
+		return nil, err
+	}
+
+	bw.raw(statusBytes)
+	bw.raw(e.TransactionDigest[:])
+	bw.write(uint32(len(e.MutatedObjects)))
+	for _, m := range e.MutatedObjects {
+		mBytes, err := m.Serialize()
+		if err != nil {
+			return nil, err
+		}
+		bw.raw(mBytes)
+	}
+
+	return buf.Bytes(), nil
+}
+
+var ErrDigestFailedFromSerialization = errors.New("digest failed from serialization")
+
+func (e ExecutionEffect) Digest() (Digest, error) {
+	buf, err := e.Serialize()
+	if err != nil {
+		return [32]byte{}, ErrDigestFailedFromSerialization
+	}
+	return sha3.Sum256(buf), nil
+}
+
+type ExecutionDigests struct {
+	Transaction Digest
+	Effect      Digest
+}
+
+func (e ExecutionDigests) Serialize() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	bw := binWriter{w: buf}
+
+	bw.raw(e.Transaction[:])
+	bw.raw(e.Effect[:])
+	return buf.Bytes(), nil
+}
+
+type CheckPointContents struct {
+	executionDigests []ExecutionDigests
+}
+
+func NewCheckPointContents(executionDigests []ExecutionDigests) CheckPointContents {
+	return CheckPointContents{
+		executionDigests: executionDigests,
+	}
+}
+
+func (c CheckPointContents) Serialize() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	bw := binWriter{w: buf}
+
+	bw.write(uint32(len(c.executionDigests)))
+
+	for _, tx := range c.executionDigests {
+		txRaw, err := tx.Serialize()
+		if err != nil {
+			return nil, err
+		}
+		bw.raw(txRaw)
+	}
+
+	return buf.Bytes(), nil
+}
+
+func (c CheckPointContents) Digest() (Digest, error) {
+	buf, err := c.Serialize()
+	if err != nil {
+		return [32]byte{}, err
+	}
+	return sha3.Sum256(buf), nil
+}
+
 type MutatedObjects struct {
 	Before ObjectRef
 	After  ObjectRef
+}
+
+func (m MutatedObjects) Serialize() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	beforeBytes, err := m.Before.Serialize()
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := buf.Write(beforeBytes); err != nil {
+		return nil, err
+	}
+
+	afterBytes, err := m.After.Serialize()
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := buf.Write(afterBytes); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 var (
@@ -124,13 +237,24 @@ func (e *ExecutionEngin) Execute(tx *TransactionData, signature Signature) (*Exe
 	}
 
 	effect.TransactionDigest = txDigest
-	effect.Status = TransferStatus{nil, true}
+	effect.Status = TransferStatus{true}
 	effect.GasUsed = struct{}{}
 
 	return effect, nil
 }
 
 type TransferStatus struct {
-	err     error
 	success bool
+}
+
+func (t TransferStatus) Serialize() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	bw := binWriter{w: buf}
+	if t.success {
+		bw.raw([]byte{0x01})
+		return buf.Bytes(), nil
+	}
+
+	bw.raw([]byte{0x00})
+	return buf.Bytes(), nil
 }

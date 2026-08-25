@@ -66,6 +66,20 @@ type ObjectRef struct {
 	Digest   Digest
 }
 
+func (o *ObjectRef) Serialize() ([]byte, error) {
+	buf := bytes.NewBuffer(nil)
+	bw := &binWriter{w: buf}
+	bw.raw(o.ObjectId[:])
+	bw.write(o.Version)
+	bw.raw(o.Digest[:])
+
+	if bw.err != nil {
+		return nil, bw.err
+	}
+
+	return bw.w.Bytes(), nil
+}
+
 func (o *Object) Ref() (*ObjectRef, error) {
 	buf, err := o.Serialize()
 	if err != nil {

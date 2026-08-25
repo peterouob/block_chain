@@ -22,7 +22,6 @@ type Signature struct {
 
 func ParseSignature(sig []byte) *Signature {
 	if len(sig) != 98 {
-		panic("invalid signature length")
 		return nil
 	}
 
