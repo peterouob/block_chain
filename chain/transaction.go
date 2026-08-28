@@ -2,9 +2,8 @@ package chain
 
 import (
 	"bytes"
+	"crypto/sha3"
 	"errors"
-
-	"golang.org/x/crypto/sha3"
 )
 
 type EpochId uint64
@@ -27,7 +26,7 @@ func NewTransactionData(sender Address, kind TransactionKind, gasData GasData, e
 
 func (t *TransactionData) Serialize() ([]byte, error) {
 	buf := bytes.NewBuffer(nil)
-	bw := &binWriter{w: buf}
+	bw := NewBinWriter(buf)
 
 	kindBytes, err := t.Kind.serialize()
 	if err != nil {
@@ -117,7 +116,7 @@ func NewGasData(payments []ObjectRef, owner Address, price uint64, budget uint64
 
 func (g *GasData) Serialize() ([]byte, error) {
 	buf := bytes.NewBuffer(nil)
-	bw := &binWriter{w: buf}
+	bw := NewBinWriter(buf)
 
 	bw.write(uint32(len(g.Payments)))
 	for _, p := range g.Payments {
@@ -163,7 +162,7 @@ type EpochExpire struct {
 func (e EpochExpire) expireType() {}
 func (e EpochExpire) serialize() ([]byte, error) {
 	buf := bytes.NewBuffer(nil)
-	bw := &binWriter{w: buf}
+	bw := NewBinWriter(buf)
 	bw.raw([]byte{EpochExpireHeader})
 	bw.write(uint64(e.EpochId))
 	if bw.err != nil {
@@ -197,7 +196,7 @@ func (p *ProgrammableTransaction) transactionType() {}
 
 func (p *ProgrammableTransaction) serialize() ([]byte, error) {
 	buf := bytes.NewBuffer(nil)
-	bw := &binWriter{w: buf}
+	bw := NewBinWriter(buf)
 
 	bw.raw([]byte{ProgrammableTransactionHeader})
 
@@ -245,7 +244,7 @@ func (t *TransferObject) Command() {}
 
 func (t *TransferObject) serialize() ([]byte, error) {
 	buf := bytes.NewBuffer(nil)
-	bw := &binWriter{w: buf}
+	bw := NewBinWriter(buf)
 
 	bw.raw([]byte{TransferObjectHeader})
 
@@ -280,7 +279,7 @@ func (r *RefCallArgs) argsType() {}
 
 func (r *RefCallArgs) serialize() ([]byte, error) {
 	buf := bytes.NewBuffer(nil)
-	bw := &binWriter{w: buf}
+	bw := NewBinWriter(buf)
 
 	bw.raw([]byte{RefCallArgsHeader})
 	bw.write(r.Ref.ObjectId)
@@ -301,7 +300,7 @@ func (v *ValueCallArgs) argsType() {}
 
 func (v *ValueCallArgs) serialize() ([]byte, error) {
 	buf := bytes.NewBuffer(nil)
-	bw := &binWriter{w: buf}
+	bw := NewBinWriter(buf)
 
 	bw.raw([]byte{ValueCallArgsHeader})
 	addrBytes := []byte(v.Address)

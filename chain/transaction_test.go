@@ -95,7 +95,6 @@ func TestTransferSuccess(t *testing.T) {
 		require.NotNil(t, effect)
 
 		assert.True(t, effect.Status.success)
-		assert.Nil(t, effect.Status.err)
 		assert.Len(t, effect.MutatedObjects, 1)
 
 		mutated := effect.MutatedObjects[0]

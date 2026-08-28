@@ -140,10 +140,10 @@ func TestStoreOwnerQueries(t *testing.T) {
 
 	t.Run("DeleteAllFromOwner", func(t *testing.T) {
 		store := NewInMemStore()
-		for i := byte(0); i < 5; i++ {
+		for i := range byte(5) {
 			require.NoError(t, store.Put(newStoreTestObject(i, &AddressOwner{Address: "alice"})))
 		}
-		for i := byte(0); i < 5; i++ {
+		for i := range byte(5) {
 			require.NoError(t, store.Delete(newTestObjectId(i)))
 		}
 		objs, _ := store.GetByOwner("alice")
@@ -153,13 +153,13 @@ func TestStoreOwnerQueries(t *testing.T) {
 	t.Run("ManyObjects", func(t *testing.T) {
 		store := NewInMemStore()
 		count := 1000
-		for i := 0; i < count; i++ {
+		for i := range count {
 			addr := Address(fmt.Sprintf("addr_%d", i%10))
 			obj := newStoreTestObject(byte(i%256), &AddressOwner{Address: addr})
 			obj.data.(*MoveObject).ObjectId = ObjectId{byte(i >> 8), byte(i)}
 			require.NoError(t, store.Put(obj))
 		}
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			addr := Address(fmt.Sprintf("addr_%d", i))
 			objs, _ := store.GetByOwner(addr)
 			assert.Equal(t, 100, len(objs))
@@ -219,7 +219,7 @@ func TestStoreConcurrency(t *testing.T) {
 		store := NewInMemStore()
 		var wg sync.WaitGroup
 		n := 100
-		for i := 0; i < n; i++ {
+		for i := range n {
 			wg.Go(func() {
 				obj := newStoreTestObject(byte(i), &AddressOwner{Address: "alice"})
 				obj.data.(*MoveObject).ObjectId = ObjectId{byte(i)}
@@ -235,11 +235,11 @@ func TestStoreConcurrency(t *testing.T) {
 	t.Run("ConcurrentOwnerTransfer", func(t *testing.T) {
 		store := NewInMemStore()
 		n := 50
-		for i := 0; i < n; i++ {
+		for i := range n {
 			require.NoError(t, store.Put(newStoreTestObject(byte(i), &AddressOwner{Address: "alice"})))
 		}
 		var wg sync.WaitGroup
-		for i := 0; i < n; i++ {
+		for i := range n {
 			wg.Go(func() {
 				obj := newStoreTestObject(byte(i), &AddressOwner{Address: "bob"})
 				_ = store.Put(obj)

@@ -2,11 +2,10 @@ package chain
 
 import (
 	"bytes"
+	"crypto/sha3"
 	"errors"
 	"maps"
 	"slices"
-
-	"golang.org/x/crypto/sha3"
 )
 
 type (
@@ -34,16 +33,16 @@ func (o *Object) Serialize() ([]byte, error) {
 		return nil, err
 	}
 	buf := bytes.NewBuffer(nil)
-	bf := &binWriter{w: buf}
-	bf.raw(data)
+	bw := NewBinWriter(buf)
+	bw.raw(data)
 	owner, err := o.owner.serialize()
 	if err != nil {
 		return nil, err
 	}
-	bf.raw(owner)
-	bf.raw(o.previousTransaction[:])
-	bf.write(o.storageRebate)
-	return buf.Bytes(), bf.err
+	bw.raw(owner)
+	bw.raw(o.previousTransaction[:])
+	bw.write(o.storageRebate)
+	return buf.Bytes(), bw.err
 }
 
 func (o *Object) GetObjectID() ObjectId {
@@ -68,7 +67,7 @@ type ObjectRef struct {
 
 func (o *ObjectRef) Serialize() ([]byte, error) {
 	buf := bytes.NewBuffer(nil)
-	bw := &binWriter{w: buf}
+	bw := NewBinWriter(buf)
 	bw.raw(o.ObjectId[:])
 	bw.write(o.Version)
 	bw.raw(o.Digest[:])
@@ -113,7 +112,7 @@ type AddressOwner struct {
 func (a *AddressOwner) ownerKind() {}
 func (a *AddressOwner) serialize() ([]byte, error) {
 	buf := bytes.NewBuffer(nil)
-	bw := &binWriter{w: buf}
+	bw := NewBinWriter(buf)
 	bw.raw([]byte{AddressOwnerHeader})
 	bw.write(uint32(len(a.Address)))
 	bw.raw([]byte(a.Address))
@@ -127,7 +126,7 @@ type ObjectOwner struct {
 func (o *ObjectOwner) ownerKind() {}
 func (o *ObjectOwner) serialize() ([]byte, error) {
 	buf := bytes.NewBuffer(nil)
-	bw := &binWriter{w: buf}
+	bw := NewBinWriter(buf)
 	bw.raw([]byte{ObjectOwnerHeader})
 	bw.raw(o.ParentId[:])
 	return buf.Bytes(), bw.err
@@ -141,7 +140,7 @@ type SharedOwner struct {
 func (s *SharedOwner) ownerKind() {}
 func (s *SharedOwner) serialize() ([]byte, error) {
 	buf := bytes.NewBuffer(make([]byte, 0, 8+1))
-	bw := &binWriter{w: buf}
+	bw := NewBinWriter(buf)
 	bw.raw([]byte{SharedOwnerHeader})
 	bw.write(s.SharedVersion)
 	return buf.Bytes(), bw.err
@@ -152,7 +151,7 @@ type ImmutableOwner struct{}
 func (i *ImmutableOwner) ownerKind() {}
 func (i *ImmutableOwner) serialize() ([]byte, error) {
 	buf := bytes.NewBuffer(make([]byte, 0, 1))
-	bw := &binWriter{w: buf}
+	bw := NewBinWriter(buf)
 	bw.raw([]byte{ImmutableOwnerHeader})
 	return buf.Bytes(), bw.err
 }
@@ -190,7 +189,7 @@ func (m *MoveObject) getInformation() objectInformation {
 
 func (m *MoveObject) Serialize() ([]byte, error) {
 	buf := bytes.NewBuffer(nil)
-	bw := &binWriter{w: buf}
+	bw := NewBinWriter(buf)
 	bw.raw([]byte{MoveObjectHeader})
 	bw.write(m.ObjectId)
 	bw.write(m.Version)
@@ -228,7 +227,7 @@ func (m *MovePackage) getInformation() objectInformation {
 func (m *MovePackage) Serialize() ([]byte, error) {
 
 	buf := bytes.NewBuffer(nil)
-	bw := &binWriter{w: buf}
+	bw := NewBinWriter(buf)
 	bw.raw([]byte{MoveModuleHeader})
 	bw.write(m.ObjectId)
 	bw.write(m.Version)

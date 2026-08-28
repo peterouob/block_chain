@@ -61,7 +61,7 @@ func TestSerialize(t *testing.T) {
 		first, err := obj.Serialize()
 		require.NoError(t, err, "序列化不應失敗")
 
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			result, err := obj.Serialize()
 			require.NoError(t, err)
 			assert.Equal(t, first, result, "第 %d 次序列化結果與第一次不同", i)
@@ -85,7 +85,7 @@ func TestSerialize(t *testing.T) {
 		first, err := pkg.Serialize()
 		require.NoError(t, err)
 
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			result, err := pkg.Serialize()
 			require.NoError(t, err)
 			assert.Equal(t, first, result, "MovePackage 第 %d 次序列化不一致", i)
@@ -99,7 +99,7 @@ func TestObjectRefDigestDeterministic(t *testing.T) {
 	firstRef, err := obj.Ref()
 	require.NoError(t, err)
 
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		ref, err := obj.Ref()
 		require.NoError(t, err)
 		assert.Equal(t, firstRef.Digest, ref.Digest, "第 %d 次 Digest 不一致", i)
@@ -570,7 +570,7 @@ func TestOwnerSerializeDifference(t *testing.T) {
 		results[i], err = o.serialize()
 		require.NoError(t, err)
 	}
-	for i := 0; i < len(results); i++ {
+	for i := range results {
 		for j := i + 1; j < len(results); j++ {
 			assert.NotEqual(t, results[i], results[j],
 				"Owner 類型 %d 和 %d 序列化結果不應相同", i, j)
@@ -648,7 +648,7 @@ func TestMoveObjectSerializeFormat(t *testing.T) {
 	assert.Equal(t, byte(MoveObjectHeader), buf[offset], "offset 0: type tag")
 	offset += 1
 
-	for i := 0; i < 32; i++ {
+	for i := range 32 {
 		assert.Equal(t, byte(0xAA), buf[offset+i], "offset %d: ObjectId[%d]", offset+i, i)
 	}
 	offset += 32

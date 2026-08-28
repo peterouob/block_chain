@@ -6,7 +6,7 @@ import (
 	"errors"
 )
 
-type Moneier interface {
+type TransactionBlock interface {
 	Serialize() ([]byte, error)
 	Digest() (Digest, error)
 }
@@ -25,7 +25,7 @@ type ExecutionEffect struct {
 func (e ExecutionEffect) Serialize() ([]byte, error) {
 	buf := new(bytes.Buffer)
 
-	bw := binWriter{w: buf}
+	bw := NewBinWriter(buf)
 	statusBytes, err := e.Status.Serialize()
 	if err != nil {
 		return nil, err
@@ -62,46 +62,11 @@ type ExecutionDigests struct {
 
 func (e ExecutionDigests) Serialize() ([]byte, error) {
 	buf := new(bytes.Buffer)
-	bw := binWriter{w: buf}
+	bw := NewBinWriter(buf)
 
 	bw.raw(e.Transaction[:])
 	bw.raw(e.Effect[:])
 	return buf.Bytes(), nil
-}
-
-type CheckPointContents struct {
-	executionDigests []ExecutionDigests
-}
-
-func NewCheckPointContents(executionDigests []ExecutionDigests) CheckPointContents {
-	return CheckPointContents{
-		executionDigests: executionDigests,
-	}
-}
-
-func (c CheckPointContents) Serialize() ([]byte, error) {
-	buf := new(bytes.Buffer)
-	bw := binWriter{w: buf}
-
-	bw.write(uint32(len(c.executionDigests)))
-
-	for _, tx := range c.executionDigests {
-		txRaw, err := tx.Serialize()
-		if err != nil {
-			return nil, err
-		}
-		bw.raw(txRaw)
-	}
-
-	return buf.Bytes(), nil
-}
-
-func (c CheckPointContents) Digest() (Digest, error) {
-	buf, err := c.Serialize()
-	if err != nil {
-		return [32]byte{}, err
-	}
-	return sha3.Sum256(buf), nil
 }
 
 type MutatedObjects struct {
@@ -249,7 +214,7 @@ type TransferStatus struct {
 
 func (t TransferStatus) Serialize() ([]byte, error) {
 	buf := new(bytes.Buffer)
-	bw := binWriter{w: buf}
+	bw := NewBinWriter(buf)
 	if t.success {
 		bw.raw([]byte{0x01})
 		return buf.Bytes(), nil
